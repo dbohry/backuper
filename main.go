@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/go-cmd/cmd"
@@ -19,6 +20,7 @@ func main() {
 	backupDir := getEnv("BACKUP_DIR", "./backup")
 	notifyURL := getEnv("NOTIFY_URL", "https://notify.lhamacorp.com/backup")
 	serviceList := getEnv("BACKUP_SERVICES", "")
+	timer, _ := strconv.Atoi(getEnv("SLEEP", "40"))
 	ageLimit := 30 * 24 * time.Hour // 30 days
 
 	// Clean old backups
@@ -37,6 +39,9 @@ func main() {
 	} else {
 		notifyCompletion("Saturn backup contain errors", notifyURL)
 	}
+
+	fmt.Printf("Sleeping again... see you in %d hours\n", timer)
+	time.Sleep(time.Duration(timer) * time.Hour)
 
 }
 
