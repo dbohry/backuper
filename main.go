@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -107,6 +108,8 @@ func runCommand(command string, args ...string) *cmd.Status {
 }
 
 func notifyCompletion(message, url string) {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
 	resp, err := http.Post(url, "application/x-www-form-urlencoded", strings.NewReader(message))
 	if err != nil {
 		fmt.Println("Failed to send notification:", err)
