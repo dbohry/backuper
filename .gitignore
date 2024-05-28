@@ -2,3 +2,5 @@
 *.iml
 *.csv
 app
+.DS_Store
+config.json

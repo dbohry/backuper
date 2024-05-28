@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/go-cmd/cmd"
@@ -13,24 +15,45 @@ import (
 	"strings"
 )
 
-func main() {
-	fmt.Println("Removing old backups...")
+type Config struct {
+	BaseDir     string `json:"baseDir"`
+	NotifyURL   string `json:"notifyURL"`
+	ServiceList string `json:"serviceList"`
+	Timer       int    `json:"timer"`
+}
 
-	// Define the backup directory and age limit
-	backupDir := getEnv("BACKUP_DIR", "./backup")
-	notifyURL := getEnv("NOTIFY_URL", "https://notify.lhamacorp.com/backup")
-	serviceList := getEnv("BACKUP_SERVICES", "")
-	timer, _ := strconv.Atoi(getEnv("SLEEP", "40"))
-	ageLimit := 30 * 24 * time.Hour // 30 days
+func main() {
+	// Read configuration from config.json
+	configFile, err := os.Open("config.json")
+	if err != nil {
+		log.Fatalf("Error opening config file: %v", err)
+	}
+	defer configFile.Close()
+
+	byteValue, _ := io.ReadAll(configFile)
+
+	var config Config
+	err = json.Unmarshal(byteValue, &config)
+	if err != nil {
+		log.Fatalf("Error parsing config file: %v", err)
+	}
+
+	// Use config values
+	baseDir := config.BaseDir
+	notifyURL := config.NotifyURL
+	serviceList := config.ServiceList
+	timer := config.Timer
+
+	backupDir := baseDir + "/backup"
 
 	// Clean old backups
-	cleanOldBackups(backupDir, ageLimit)
+	cleanOldBackups(backupDir)
 
 	fmt.Println("Creating new backup...")
 	services := strings.Split(serviceList, ",")
 	containErrors := 0
 	for _, service := range services {
-		containErrors = backupService(service)
+		containErrors = backupService(service, baseDir)
 	}
 
 	// Notify completion
@@ -52,7 +75,9 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func cleanOldBackups(directory string, ageLimit time.Duration) {
+func cleanOldBackups(directory string) {
+	fmt.Println("Removing old backups...")
+	ageLimit := 30 * 24 * time.Hour
 	filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -67,7 +92,7 @@ func cleanOldBackups(directory string, ageLimit time.Duration) {
 	})
 }
 
-func backupService(serviceName string) int {
+func backupService(serviceName string, baseDir string) int {
 	var containErrors = 0
 	if serviceName == "" {
 		fmt.Println("Error: No service name provided.")
@@ -77,9 +102,9 @@ func backupService(serviceName string) int {
 	fmt.Println("Stopping the service:", serviceName)
 	runCommand("docker", "stop", serviceName)
 
-	backupFileName := fmt.Sprintf("backup/%s-%s.tar.gz", serviceName, time.Now().Format("2006-01-02"))
+	backupFileName := fmt.Sprintf(baseDir+"/backup/%s-%s.tar.gz", serviceName, time.Now().Format("2006-01-02"))
 	fmt.Println("Creating backup file:", backupFileName)
-	result := runCommand("tar", "-zcvf", backupFileName, fmt.Sprintf("docker/%s", serviceName))
+	result := runCommand("tar", "-zcvf", backupFileName, fmt.Sprintf(baseDir+"/docker/%s", serviceName))
 	if result.Exit != 0 {
 		fmt.Println("Backup failed")
 		containErrors = 1
