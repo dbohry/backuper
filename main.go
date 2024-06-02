@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-cmd/cmd"
+	"github.com/robfig/cron/v3"
 	"net/http"
 	"strings"
 )
@@ -19,7 +20,7 @@ type Config struct {
 	BaseDir     string `json:"baseDir"`
 	NotifyURL   string `json:"notifyURL"`
 	ServiceList string `json:"serviceList"`
-	Timer       int    `json:"timer"`
+	Timer       string `json:"timer"`
 }
 
 func main() {
@@ -42,30 +43,29 @@ func main() {
 	baseDir := config.BaseDir
 	notifyURL := config.NotifyURL
 	serviceList := config.ServiceList
+	backupDir := baseDir + "/backup"
 	timer := config.Timer
 
-	backupDir := baseDir + "/backup"
+	c := cron.New()
+	_, _ = c.AddFunc(timer, func() {
+		cleanOldBackups(backupDir)
 
-	// Clean old backups
-	cleanOldBackups(backupDir)
+		fmt.Println("Creating new backup...")
+		services := strings.Split(serviceList, ",")
+		containErrors := 0
+		for _, service := range services {
+			containErrors = backupService(service, baseDir)
+		}
 
-	fmt.Println("Creating new backup...")
-	services := strings.Split(serviceList, ",")
-	containErrors := 0
-	for _, service := range services {
-		containErrors = backupService(service, baseDir)
-	}
+		if containErrors == 0 {
+			notifyCompletion("Saturn backup completed", notifyURL)
+		} else {
+			notifyCompletion("Saturn backup contain errors", notifyURL)
+		}
+	})
 
-	// Notify completion
-	if containErrors == 0 {
-		notifyCompletion("Saturn backup completed", notifyURL)
-	} else {
-		notifyCompletion("Saturn backup contain errors", notifyURL)
-	}
-
-	fmt.Printf("Sleeping again... see you in %d hours\n", timer)
-	time.Sleep(time.Duration(timer) * time.Hour)
-
+	c.Start()
+	select {}
 }
 
 func getEnv(key, fallback string) string {
