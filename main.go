@@ -19,6 +19,7 @@ import (
 type Config struct {
 	BaseDir     string `json:"baseDir"`
 	NotifyURL   string `json:"notifyURL"`
+	ServerName  string `json:"serverName"`
 	ServiceList string `json:"serviceList"`
 	Timer       string `json:"timer"`
 }
@@ -42,6 +43,7 @@ func main() {
 	// Use config values
 	baseDir := config.BaseDir
 	notifyURL := config.NotifyURL
+	serverName := config.ServerName
 	serviceList := config.ServiceList
 	backupDir := baseDir + "/backup"
 	timer := config.Timer
@@ -58,9 +60,9 @@ func main() {
 		}
 
 		if containErrors == 0 {
-			notifyCompletion("Saturn backup completed", notifyURL)
+			notifyCompletion(serverName+" backup completed", notifyURL)
 		} else {
-			notifyCompletion("Saturn backup contain errors", notifyURL)
+			notifyCompletion(serverName+" backup contain errors", notifyURL)
 		}
 	})
 
